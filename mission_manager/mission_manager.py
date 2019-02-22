@@ -1,5 +1,6 @@
 import math
-import time
+from datetime import timedelta, datetime
+from dateutil.parser import parse as parse_timestamp
 
 from builtin_interfaces.msg import Time
 import rclpy
@@ -25,8 +26,17 @@ INTERACTIVE_COMMANDS_DESCRIPTIONS = {
 }
 
 
-def get_current_time_msg():
-    modf = math.modf(time.time())
+INTERACTIVE_COMMANDS_ADDITIONAL_HELP = (
+    'Commands {} and {} additionally accepts an optional argument, '
+    'start time, which can be either a date in a format accepted by '
+    'dateutil.parser.parse function or "+s" where s is a number of '
+    'seconds after which the mission should start.'.format(
+        USER_CMD_MISSION_START, USER_CMD_MISSION_END)
+)
+
+
+def get_time_msg(timestamp):
+    modf = math.modf(timestamp.timestamp())
     nanosec, sec = map(int, (modf[0]*10**9, modf[1]))
     return Time(sec=sec, nanosec=nanosec)
 
@@ -40,17 +50,17 @@ class MissionManager(Node):
             MISSION_TOPIC_NAME
         )
 
-    def start_mission(self):
+    def start_mission(self, timestamp):
         msg = MissionCommand()
         msg.command = MissionCommand.MISSION_START
-        msg.stamp = get_current_time_msg()
+        msg.stamp = get_time_msg(timestamp)
         self.publisher_.publish(msg)
         return msg.stamp
 
-    def end_mission(self):
+    def end_mission(self, timestamp):
         msg = MissionCommand()
         msg.command = MissionCommand.MISSION_END
-        msg.stamp = get_current_time_msg()
+        msg.stamp = get_time_msg(timestamp)
         self.publisher_.publish(msg)
         return msg.stamp
 
@@ -62,19 +72,34 @@ class MissionManager(Node):
         for cmd, desc in INTERACTIVE_COMMANDS_DESCRIPTIONS.items():
             print('\t{} --- {}'.format(cmd, desc))
 
+    @staticmethod
+    def parse_cmd_timestamp(cmd):
+        args = cmd.split()
+        if len(args) == 1:
+            return datetime.now()
+        elif args[1][0] == '+':
+            s = timedelta(seconds=int(args[1][1:]))
+            timestamp = datetime.now()+s
+        else:
+            timestamp = parse_timestamp(args[1])
+
+        return timestamp
+
     def interpret_command(self, cmd):
         if cmd == USER_CMD_CLOSE:
             return
         elif cmd == USER_CMD_HELP:
             self.display_help()
-        elif cmd == USER_CMD_MISSION_END:
+        elif cmd.startswith(USER_CMD_MISSION_END):
             print('Ending mission')
-            ts = self.end_mission()
-            print('{}.{}'.format(ts.sec, ts.nanosec))
-        elif cmd == USER_CMD_MISSION_START:
+            timestamp = self.parse_cmd_timestamp(cmd)
+            self.end_mission(timestamp)
+            print('@{}'.format(timestamp))
+        elif cmd.startswith(USER_CMD_MISSION_START):
             print('Starting mission')
-            ts = self.start_mission()
-            print('{}.{}'.format(ts.sec, ts.nanosec))
+            timestamp = self.parse_cmd_timestamp(cmd)
+            self.start_mission(timestamp)
+            print('@{}'.format(timestamp))
         else:
             print('Unknown command. Use "h" for help.')
 
