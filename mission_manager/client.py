@@ -63,11 +63,19 @@ class MissionClientMixin(object):
 
     def listener_callback(self, msg):
         if msg.command == MissionCommand.MISSION_START:
+            self.get_logger().info(
+                'Received mission start'
+            )
+
             def op(exe):
                 exe.start_mission_at_timestamp(
                     _datetime_from_time_msg(msg.stamp)
                 )
         elif msg.command == MissionCommand.MISSION_END:
+            self.get_logger().info(
+                'Received mission end'
+            )
+
             def op(exe):
                 exe.end_mission_at_timestamp(
                     _datetime_from_time_msg(msg.stamp)

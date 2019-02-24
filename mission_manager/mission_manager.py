@@ -1,6 +1,7 @@
 import math
 from datetime import timedelta, datetime
 from dateutil.parser import parse as parse_timestamp
+import sys
 
 from builtin_interfaces.msg import Time
 import rclpy
@@ -86,6 +87,7 @@ class MissionManager(Node):
         return timestamp
 
     def interpret_command(self, cmd):
+        cmd = cmd.strip()
         if cmd == USER_CMD_CLOSE:
             return
         elif cmd == USER_CMD_HELP:
@@ -113,7 +115,24 @@ class MissionManager(Node):
 
 
 def cmd(args=None):
-    print('Not implemented yet')
+    rclpy.init(args=args)
+    manager = MissionManager()
+    t1 = None
+
+    def _execute_commands():
+        cmds = sys.argv[-1].split(';')
+        for cmd in cmds:
+            manager.interpret_command(cmd)
+        manager.destroy_timer(t1)
+
+    def _shutdown():
+        print("Bye, bye!")
+        sys.exit(0)
+
+    t1 = manager.create_timer(5, _execute_commands)
+    manager.create_timer(25, _shutdown)
+    print('Spinning')
+    rclpy.spin(manager)
 
 
 def main(args=None):
