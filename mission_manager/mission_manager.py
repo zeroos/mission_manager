@@ -129,8 +129,8 @@ def cmd(args=None):
         print("Bye, bye!")
         sys.exit(0)
 
-    t1 = manager.create_timer(5, _execute_commands)
-    manager.create_timer(25, _shutdown)
+    t1 = manager.create_timer(20, _execute_commands)
+    manager.create_timer(130, _shutdown)
     print('Spinning')
     rclpy.spin(manager)
 
