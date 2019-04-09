@@ -2,6 +2,7 @@ import math
 from datetime import timedelta, datetime
 from dateutil.parser import parse as parse_timestamp
 import sys
+import time
 
 from builtin_interfaces.msg import Time
 import rclpy
@@ -18,12 +19,18 @@ USER_CMD_MISSION_START = 's'
 USER_CMD_MISSION_END = 'e'
 USER_CMD_HELP = 'h'
 USER_CMD_CLOSE = 'c'
+USER_CMD_WAIT_NODES = 'n'
+USER_CMD_SLEEP = 'l'
+USER_CMD_QUIT = 'q'
 
 INTERACTIVE_COMMANDS_DESCRIPTIONS = {
     USER_CMD_MISSION_START: 'start mission',
     USER_CMD_MISSION_END: 'end mission',
     USER_CMD_HELP: 'display a list of allowed commands',
     USER_CMD_CLOSE: 'close the interactive mode',
+    USER_CMD_WAIT_NODES: 'wait for n nodes to subscribe',
+    USER_CMD_SLEEP: 'sleep for n seconds',
+    USER_CMD_QUIT: 'exit the program',
 }
 
 
@@ -73,6 +80,21 @@ class MissionManager(Node):
         for cmd, desc in INTERACTIVE_COMMANDS_DESCRIPTIONS.items():
             print('\t{} --- {}'.format(cmd, desc))
 
+    def wait_for_subscribed_nodes(self, n):
+        while self.count_managed_nodes() < n:
+            rclpy.spin_once(self, timeout_sec=1)
+            print("{} subscribed nodes, waiting for {}".format(
+                self.count_managed_nodes(),
+                n,
+            ))
+
+    def delayed_quit(self, n):
+        def _shutdown():
+            print("Bye, bye!")
+            sys.exit(0)
+
+        self.create_timer(n, _shutdown)
+
     @staticmethod
     def parse_cmd_timestamp(cmd):
         args = cmd.split()
@@ -102,6 +124,20 @@ class MissionManager(Node):
             timestamp = self.parse_cmd_timestamp(cmd)
             self.start_mission(timestamp)
             print('@{}'.format(timestamp))
+        elif cmd.startswith(USER_CMD_WAIT_NODES):
+            print('Waiting for subscribers')
+            n = int(cmd.split()[1])
+            self.wait_for_subscribed_nodes(n)
+        elif cmd.startswith(USER_CMD_SLEEP):
+            print('Sleeping...')
+            n = int(cmd.split()[1])
+            print('...{} seconds'.format(n))
+            time.sleep(n)
+        elif cmd.startswith(USER_CMD_QUIT):
+            print('Setting quit time...')
+            n = int(cmd.split()[1])
+            print('...in {} seconds'.format(n))
+            self.delayed_quit(n)
         else:
             print('Unknown command. Use "h" for help.')
 
@@ -113,24 +149,19 @@ class MissionManager(Node):
             self.interpret_command(cmd)
         print('Bye!')
 
+    def count_managed_nodes(self):
+        return self.count_subscribers(MISSION_TOPIC_NAME)
+
 
 def cmd(args=None):
     rclpy.init(args=args)
     manager = MissionManager()
-    t1 = None
 
-    def _execute_commands():
-        cmds = sys.argv[-1].split(';')
-        for cmd in cmds:
-            manager.interpret_command(cmd)
-        manager.destroy_timer(t1)
+    cmds = sys.argv[-1].split(';')
+    print("Executing commands '{}'".format(cmds))
+    for cmd in cmds:
+        manager.interpret_command(cmd)
 
-    def _shutdown():
-        print("Bye, bye!")
-        sys.exit(0)
-
-    t1 = manager.create_timer(20, _execute_commands)
-    manager.create_timer(130, _shutdown)
     print('Spinning')
     rclpy.spin(manager)
 
