@@ -80,13 +80,19 @@ class MissionManager(Node):
         for cmd, desc in INTERACTIVE_COMMANDS_DESCRIPTIONS.items():
             print('\t{} --- {}'.format(cmd, desc))
 
-    def wait_for_subscribed_nodes(self, n):
+    def wait_for_subscribed_nodes(self, n, timeout):
         while self.count_managed_nodes() < n:
             rclpy.spin_once(self, timeout_sec=1)
-            print("{} subscribed nodes, waiting for {}".format(
-                self.count_managed_nodes(),
-                n,
-            ))
+            print(
+                "{} subscribed nodes, waiting for {} (timeout in {}s)".format(
+                    self.count_managed_nodes(),
+                    n,
+                    timeout
+                )
+            )
+            timeout -= 1
+            if timeout == 0:
+                break
 
     def delayed_quit(self, n):
         def _shutdown():
@@ -126,8 +132,14 @@ class MissionManager(Node):
             print('@{}'.format(timestamp))
         elif cmd.startswith(USER_CMD_WAIT_NODES):
             print('Waiting for subscribers')
-            n = int(cmd.split()[1])
-            self.wait_for_subscribed_nodes(n)
+            args = cmd.split()
+            print(args, len(args))
+            n = int(args[1])
+            if len(args) > 2:
+                timeout = int(args[2])
+            else:
+                timeout = 0
+            self.wait_for_subscribed_nodes(n, timeout)
         elif cmd.startswith(USER_CMD_SLEEP):
             print('Sleeping...')
             n = int(cmd.split()[1])
