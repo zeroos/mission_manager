@@ -6,7 +6,7 @@ from rclpy.node import Node
 
 from mission_manager_msgs.msg import MissionCommand
 
-from .mission_manager import MISSION_TOPIC_NAME
+from .mission_manager import MISSION_TOPIC_NAME, get_time_msg
 
 
 def _datetime_from_time_msg(time):
@@ -56,11 +56,25 @@ class MissionExecutor:
     def change_params(self, params, timestamp):
         raise NotImplementedError()
 
+    def add_progress_callback(self, progress_callback):
+        self.report_progress = progress_callback
+
+    def report_progress(self, progress):
+        raise Exception(
+            'MissionExecutor needs to be registered with MissionClient '
+            'before reporting mission progress'
+        )
+
 
 class MissionClientMixin(object):
     def __init__(self):
         super().__init__('mission_client')
         self._executors = set()
+
+        self.publisher_ = self.create_publisher(
+            MissionCommand,
+            MISSION_TOPIC_NAME
+        )
 
         self.subscription = self.create_subscription(
             MissionCommand,
@@ -102,6 +116,9 @@ class MissionClientMixin(object):
                     params,
                     _datetime_from_time_msg(msg.stamp)
                 )
+        elif msg.command == MissionCommand.REPORT_PROGRESS:
+            def op(exe):
+                pass
         else:
             def op(exe):
                 pass
@@ -112,7 +129,15 @@ class MissionClientMixin(object):
         for exe in self._executors:
             op(exe)
 
+    def progress_callback(self, progress):
+        msg = MissionCommand()
+        msg.command = MissionCommand.REPORT_PROGRESS
+        msg.stamp = get_time_msg()
+        msg.args = [progress]
+        self.publisher_.publish(msg)
+
     def add_mission_executor(self, mission_executor):
+        mission_executor.add_progress_callback(self.progress_callback)
         self._executors.add(mission_executor)
 
 
@@ -135,6 +160,7 @@ class MockMissionExecutor(Node, MissionExecutor):
         self.get_logger().info(
             'Changing parameters to {}'.format(params)
         )
+        self.report_progress(params.get('p', 'unknown'))
 
 
 def start_mock_client(args=None):

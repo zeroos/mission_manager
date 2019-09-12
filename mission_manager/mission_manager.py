@@ -23,6 +23,8 @@ USER_CMD_WAIT_NODES = 'n'
 USER_CMD_SLEEP = 'l'
 USER_CMD_QUIT = 'q'
 USER_CMD_PARAMS = 'p'
+USER_CMD_WAIT_REPORTS = 'r'
+USER_CMD_RESET_REPORTS = 'rr'
 
 INTERACTIVE_COMMANDS_DESCRIPTIONS = {
     USER_CMD_MISSION_START: 'start mission',
@@ -34,6 +36,9 @@ INTERACTIVE_COMMANDS_DESCRIPTIONS = {
     USER_CMD_QUIT: 'exit the program',
     USER_CMD_PARAMS: 'set mission parameters, in the following format: '
                      '"A=1,B=2,C=3"',
+    USER_CMD_WAIT_REPORTS: 'wait for reports from agents, accepts two '
+    'optional arguments: number of occurrences, name of a report',
+    USER_CMD_RESET_REPORTS: 'resets all counted reports'
 }
 
 
@@ -48,7 +53,9 @@ INTERACTIVE_COMMANDS_ADDITIONAL_HELP = (
 )
 
 
-def get_time_msg(timestamp):
+def get_time_msg(timestamp=None):
+    if timestamp is None:
+        timestamp = datetime.now()
     modf = math.modf(timestamp.timestamp())
     nanosec, sec = map(int, (modf[0]*10**9, modf[1]))
     return Time(sec=sec, nanosec=nanosec)
@@ -62,6 +69,28 @@ class MissionManager(Node):
             MissionCommand,
             MISSION_TOPIC_NAME
         )
+        self.subscription = self.create_subscription(
+            MissionCommand,
+            MISSION_TOPIC_NAME,
+            self.listener_callback
+        )
+        self.subscription  # prevent unused variable warning
+        self.reset_reports()
+
+    def listener_callback(self, msg):
+        if msg.command == MissionCommand.REPORT_PROGRESS:
+            if msg.args[0] not in self.reports_counter:
+                self.reports_counter[msg.args[0]] = 0
+            self.reports_counter[msg.args[0]] += 1
+            print("Progress report: {}, #{}".format(
+                msg.args[0],
+                self.reports_counter[msg.args[0]]
+            ))
+        else:
+            pass
+
+    def reset_reports(self):
+        self.reports_counter = {}
 
     def start_mission(self, timestamp):
         msg = MissionCommand()
@@ -130,6 +159,8 @@ class MissionManager(Node):
 
     def interpret_command(self, user_input):
         cmd_all = user_input.strip().split()
+        if len(cmd_all) == 0:
+            return
         cmd = cmd_all[0]
         args = cmd_all[1:]
 
@@ -153,13 +184,40 @@ class MissionManager(Node):
             self.change_params(args[0], timestamp)
             print('@{}'.format(timestamp))
         elif cmd == USER_CMD_WAIT_NODES:
-            print('Waiting for subscribers')
-            n = int(args[0])
+            print('Waiting for subscribers (numbers include mission manager)')
+            n = int(args[0])+1
             if len(args) > 1:
                 timeout = int(args[0])
             else:
                 timeout = 0
             self.wait_for_subscribed_nodes(n, timeout)
+        elif cmd == USER_CMD_RESET_REPORTS:
+            print('Reseting reports')
+            self.reset_reports()
+        elif cmd == USER_CMD_WAIT_REPORTS:
+            print("Waiting for progress reports...")
+            try:
+                occurrences_num = int(args[0])
+            except IndexError:
+                occurrences_num = 1
+            try:
+                event_name = args[1]
+            except IndexError:
+                event_name = None
+
+            while (
+                (
+                    event_name is not None and
+                    self.reports_counter.get(event_name, 0) < occurrences_num
+                ) or (
+                    event_name is None and
+                    sum(self.reports_counter.values()) < occurrences_num
+                )
+            ):
+                rclpy.spin_once(self)
+                print('.', end='')
+            print('Done waiting')
+
         elif cmd == USER_CMD_SLEEP:
             print('Sleeping...')
             n = int(args[0])
@@ -167,7 +225,10 @@ class MissionManager(Node):
             time.sleep(n)
         elif cmd == USER_CMD_QUIT:
             print('Setting quit time...')
-            n = int(args[0])
+            try:
+                n = int(args[0])
+            except IndexError:
+                n = 0
             print('...in {} seconds'.format(n))
             self.delayed_quit(n)
         else:
