@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 
 from mission_manager_msgs.msg import MissionCommand
@@ -39,13 +41,19 @@ class MissionExecutor:
 
         self._delay_execution(_end_mission_callback, timestamp)
 
+    def change_params_at_timestamp(self, params, timestamp):
+        def _change_params_callback():
+            self.change_params(params, timestamp)
+
+        self._delay_execution(_change_params_callback, timestamp)
+
     def start_mission(self, timestamp):
         raise NotImplementedError()
 
     def end_mission(self, timestamp):
         raise NotImplementedError()
 
-    def change_params(self, params):
+    def change_params(self, params, timestamp):
         raise NotImplementedError()
 
 
@@ -80,6 +88,20 @@ class MissionClientMixin(object):
                 exe.end_mission_at_timestamp(
                     _datetime_from_time_msg(msg.stamp)
                 )
+        elif msg.command == MissionCommand.CHANGE_PARAMS:
+            self.get_logger().info(
+                'Received change params with params: {}'.format(msg.args)
+            )
+            params = {
+                name: value
+                for name, value in [p.split('=') for p in msg.args]
+            }
+
+            def op(exe):
+                exe.change_params_at_timestamp(
+                    params,
+                    _datetime_from_time_msg(msg.stamp)
+                )
         else:
             def op(exe):
                 pass
@@ -96,3 +118,43 @@ class MissionClientMixin(object):
 
 class MissionClient(MissionClientMixin, Node):
     pass
+
+
+class MockMissionExecutor(Node, MissionExecutor):
+    def start_mission(self, timestamp):
+        self.get_logger().info(
+            'Starting mission'
+        )
+
+    def end_mission(self, timestamp):
+        self.get_logger().info(
+            'Ending mission'
+        )
+
+    def change_params(self, params, timestamp):
+        self.get_logger().info(
+            'Changing parameters to {}'.format(params)
+        )
+
+
+def start_mock_client(args=None):
+    rclpy.init(args=args)
+
+    mock_executor = MockMissionExecutor('mock_mission_client')
+    mission_client = MissionClient()
+    mission_client.add_mission_executor(mock_executor)
+
+    executor = SingleThreadedExecutor()
+    executor.add_node(mock_executor)
+    executor.add_node(mission_client)
+
+    mission_client.get_logger().info(
+        'Node initialized, waiting for events.'
+    )
+    executor.spin()
+
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    start_mock_client()

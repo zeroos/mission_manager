@@ -22,6 +22,7 @@ USER_CMD_CLOSE = 'c'
 USER_CMD_WAIT_NODES = 'n'
 USER_CMD_SLEEP = 'l'
 USER_CMD_QUIT = 'q'
+USER_CMD_PARAMS = 'p'
 
 INTERACTIVE_COMMANDS_DESCRIPTIONS = {
     USER_CMD_MISSION_START: 'start mission',
@@ -31,15 +32,19 @@ INTERACTIVE_COMMANDS_DESCRIPTIONS = {
     USER_CMD_WAIT_NODES: 'wait for n nodes to subscribe',
     USER_CMD_SLEEP: 'sleep for n seconds',
     USER_CMD_QUIT: 'exit the program',
+    USER_CMD_PARAMS: 'set mission parameters, in the following format: '
+                     '"A=1,B=2,C=3"',
 }
 
 
 INTERACTIVE_COMMANDS_ADDITIONAL_HELP = (
-    'Commands {} and {} additionally accepts an optional argument, '
+    'Commands {}, {} and {} additionally accepts an optional argument, '
     'start time, which can be either a date in a format accepted by '
     'dateutil.parser.parse function or "+s" where s is a number of '
     'seconds after which the mission should start.'.format(
-        USER_CMD_MISSION_START, USER_CMD_MISSION_END)
+        USER_CMD_MISSION_START, USER_CMD_MISSION_END,
+        USER_CMD_PARAMS,
+    )
 )
 
 
@@ -72,8 +77,17 @@ class MissionManager(Node):
         self.publisher_.publish(msg)
         return msg.stamp
 
-    def change_params(self, params):
-        raise NotImplementedError()  # not implemented yet
+    def change_params(self, params_raw, timestamp):
+        params = [p.strip() for p in params_raw.split(',')]
+        assert(all('=' in p for p in params))
+        print("Parsed parameters: {}".format(params))
+
+        msg = MissionCommand()
+        msg.command = MissionCommand.CHANGE_PARAMS
+        msg.stamp = get_time_msg(timestamp)
+        msg.args = params
+        self.publisher_.publish(msg)
+        return msg.stamp
 
     def display_help(self):
         print('Available commands:')
@@ -93,6 +107,7 @@ class MissionManager(Node):
             timeout -= 1
             if timeout == 0:
                 break
+        print("{} nodes subscribed.".format(self.count_managed_nodes()))
 
     def delayed_quit(self, n):
         def _shutdown():
@@ -102,52 +117,57 @@ class MissionManager(Node):
         self.create_timer(n, _shutdown)
 
     @staticmethod
-    def parse_cmd_timestamp(cmd):
-        args = cmd.split()
-        if len(args) == 1:
+    def parse_cmd_timestamp(args):
+        if len(args) == 0:
             return datetime.now()
-        elif args[1][0] == '+':
-            s = timedelta(seconds=int(args[1][1:]))
+        elif args[0][0] == '+':
+            s = timedelta(seconds=int(args[0][1:]))
             timestamp = datetime.now()+s
         else:
-            timestamp = parse_timestamp(args[1])
+            timestamp = parse_timestamp(args[0])
 
         return timestamp
 
-    def interpret_command(self, cmd):
-        cmd = cmd.strip()
+    def interpret_command(self, user_input):
+        cmd_all = user_input.strip().split()
+        cmd = cmd_all[0]
+        args = cmd_all[1:]
+
         if cmd == USER_CMD_CLOSE:
             return
         elif cmd == USER_CMD_HELP:
             self.display_help()
-        elif cmd.startswith(USER_CMD_MISSION_END):
+        elif cmd == USER_CMD_MISSION_END:
             print('Ending mission')
-            timestamp = self.parse_cmd_timestamp(cmd)
+            timestamp = self.parse_cmd_timestamp(args)
             self.end_mission(timestamp)
             print('@{}'.format(timestamp))
-        elif cmd.startswith(USER_CMD_MISSION_START):
+        elif cmd == USER_CMD_MISSION_START:
             print('Starting mission')
-            timestamp = self.parse_cmd_timestamp(cmd)
+            timestamp = self.parse_cmd_timestamp(args)
             self.start_mission(timestamp)
             print('@{}'.format(timestamp))
-        elif cmd.startswith(USER_CMD_WAIT_NODES):
+        elif cmd == USER_CMD_PARAMS:
+            print('Changing parameters')
+            timestamp = self.parse_cmd_timestamp(args[1:])
+            self.change_params(args[0], timestamp)
+            print('@{}'.format(timestamp))
+        elif cmd == USER_CMD_WAIT_NODES:
             print('Waiting for subscribers')
-            args = cmd.split()
-            print(args, len(args))
-            n = int(args[1])
-            if len(args) > 2:
-                timeout = int(args[2])
+            n = int(args[0])
+            if len(args) > 1:
+                timeout = int(args[0])
             else:
                 timeout = 0
             self.wait_for_subscribed_nodes(n, timeout)
-        elif cmd.startswith(USER_CMD_SLEEP):
+        elif cmd == USER_CMD_SLEEP:
             print('Sleeping...')
-            n = int(cmd.split()[1])
+            n = int(args[0])
             print('...{} seconds'.format(n))
             time.sleep(n)
-        elif cmd.startswith(USER_CMD_QUIT):
+        elif cmd == USER_CMD_QUIT:
             print('Setting quit time...')
-            n = int(cmd.split()[1])
+            n = int(args[0])
             print('...in {} seconds'.format(n))
             self.delayed_quit(n)
         else:
@@ -178,11 +198,11 @@ def cmd(args=None):
     rclpy.spin(manager)
 
 
-def main(args=None):
+def cli(args=None):
     rclpy.init(args=args)
     manager = MissionManager()
     manager.interact()
 
 
 if __name__ == '__main__':
-    main()
+    cli()

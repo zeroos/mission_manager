@@ -30,8 +30,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'cli = mission_manager.mission_manager:main',
+            'cli = mission_manager.mission_manager:cli',
             'cmd = mission_manager.mission_manager:cmd',
+            'example_client = mission_manager.client:start_mock_client',
         ],
     },
 )
