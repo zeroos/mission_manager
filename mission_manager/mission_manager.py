@@ -54,7 +54,7 @@ INTERACTIVE_COMMANDS_ADDITIONAL_HELP = (
 
 
 def get_time_msg(timestamp=None):
-    if timestamp is None:
+    if not timestamp:
         timestamp = datetime.now()
     modf = math.modf(timestamp.timestamp())
     nanosec, sec = map(int, (modf[0]*10**9, modf[1]))
@@ -106,9 +106,7 @@ class MissionManager(Node):
         self.publisher_.publish(msg)
         return msg.stamp
 
-    def change_params(self, params_raw, timestamp):
-        params = [p.strip() for p in params_raw.split(',')]
-        assert(all('=' in p for p in params))
+    def change_params(self, params, timestamp):
         print("Parsed parameters: {}".format(params))
 
         msg = MissionCommand()
@@ -135,8 +133,23 @@ class MissionManager(Node):
             )
             timeout -= 1
             if timeout == 0:
-                break
+                print("timeout")
+                return False
         print("{} nodes subscribed.".format(self.count_managed_nodes()))
+        return True
+
+    def wait_for_progress_reports(self, occurrences_num, event_name):
+        while (
+            (
+                event_name is not None and
+                self.reports_counter.get(event_name, 0) < occurrences_num
+            ) or (
+                event_name is None and
+                sum(self.reports_counter.values()) < occurrences_num
+            )
+        ):
+            rclpy.spin_once(self)
+            print('.', end='')
 
     def delayed_quit(self, n):
         def _shutdown():
@@ -181,7 +194,9 @@ class MissionManager(Node):
         elif cmd == USER_CMD_PARAMS:
             print('Changing parameters')
             timestamp = self.parse_cmd_timestamp(args[1:])
-            self.change_params(args[0], timestamp)
+            params = [p.strip() for p in args[0].split(',')]
+            assert(all('=' in p for p in params))
+            self.change_params(params, timestamp)
             print('@{}'.format(timestamp))
         elif cmd == USER_CMD_WAIT_NODES:
             print('Waiting for subscribers (numbers include mission manager)')
@@ -205,17 +220,7 @@ class MissionManager(Node):
             except IndexError:
                 event_name = None
 
-            while (
-                (
-                    event_name is not None and
-                    self.reports_counter.get(event_name, 0) < occurrences_num
-                ) or (
-                    event_name is None and
-                    sum(self.reports_counter.values()) < occurrences_num
-                )
-            ):
-                rclpy.spin_once(self)
-                print('.', end='')
+            self.wait_for_progress_reports(occurrences_num, event_name)
             print('Done waiting')
 
         elif cmd == USER_CMD_SLEEP:
