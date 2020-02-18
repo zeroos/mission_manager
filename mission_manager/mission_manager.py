@@ -7,6 +7,7 @@ import time
 from builtin_interfaces.msg import Time
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSPresetProfiles
 
 from mission_manager_msgs.msg import MissionCommand
 
@@ -67,12 +68,14 @@ class MissionManager(Node):
         super().__init__('mission_manager')
         self.publisher_ = self.create_publisher(
             MissionCommand,
-            MISSION_TOPIC_NAME
+            MISSION_TOPIC_NAME,
+            qos_profile=QoSPresetProfiles.get_from_short_key('PARAMETER_EVENTS')
         )
         self.subscription = self.create_subscription(
             MissionCommand,
             MISSION_TOPIC_NAME,
-            self.listener_callback
+            self.listener_callback,
+            qos_profile=QoSPresetProfiles.get_from_short_key('PARAMETER_EVENTS')
         )
         self.subscription  # prevent unused variable warning
         self.reset_reports()
