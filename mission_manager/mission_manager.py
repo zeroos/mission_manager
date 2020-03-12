@@ -69,13 +69,17 @@ class MissionManager(Node):
         self.publisher_ = self.create_publisher(
             MissionCommand,
             MISSION_TOPIC_NAME,
-            qos_profile=QoSPresetProfiles.get_from_short_key('PARAMETER_EVENTS')
+            qos_profile=QoSPresetProfiles.get_from_short_key(
+                'PARAMETER_EVENTS'
+            )
         )
         self.subscription = self.create_subscription(
             MissionCommand,
             MISSION_TOPIC_NAME,
             self.listener_callback,
-            qos_profile=QoSPresetProfiles.get_from_short_key('PARAMETER_EVENTS')
+            qos_profile=QoSPresetProfiles.get_from_short_key(
+                'PARAMETER_EVENTS'
+            )
         )
         self.subscription  # prevent unused variable warning
         self.reset_reports()
@@ -173,8 +177,13 @@ class MissionManager(Node):
 
         return timestamp
 
-    def interpret_command(self, user_input):
-        cmd_all = user_input.strip().split()
+    def interpret_commands(self, user_input):
+        cmds = user_input.split(';')
+        for cmd in cmds:
+            self.interpret_command(cmd)
+
+    def interpret_command(self, command):
+        cmd_all = command.strip().split()
         if len(cmd_all) == 0:
             return
         cmd = cmd_all[0]
@@ -247,7 +256,7 @@ class MissionManager(Node):
         cmd = ''
         while cmd != USER_CMD_CLOSE:
             cmd = input('CMD >> ')
-            self.interpret_command(cmd)
+            self.interpret_commands(cmd)
         print('Bye!')
 
     def count_managed_nodes(self):
@@ -258,10 +267,9 @@ def cmd(args=None):
     rclpy.init(args=args)
     manager = MissionManager()
 
-    cmds = sys.argv[-1].split(';')
-    print("Executing commands '{}'".format(cmds))
-    for cmd in cmds:
-        manager.interpret_command(cmd)
+    cmd_str = sys.argv[-1]
+    print("Executing commands '{}'".format(cmd_str))
+    manager.interpret_commands(cmd_str)
 
     print('Spinning')
     rclpy.spin(manager)
