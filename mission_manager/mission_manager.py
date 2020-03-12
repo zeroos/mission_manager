@@ -1,6 +1,7 @@
 import math
 from datetime import timedelta, datetime
 from dateutil.parser import parse as parse_timestamp
+import readline
 import sys
 import time
 
@@ -255,8 +256,12 @@ class MissionManager(Node):
         self.display_help()
         cmd = ''
         while cmd != USER_CMD_CLOSE:
-            cmd = input('CMD >> ')
-            self.interpret_commands(cmd)
+            try:
+                cmd = input('CMD >> ')
+                self.interpret_commands(cmd)
+            except Exception as e:
+                print("ERROR", e)
+
         print('Bye!')
 
     def count_managed_nodes(self):
@@ -277,6 +282,8 @@ def cmd(args=None):
 
 def cli(args=None):
     rclpy.init(args=args)
+    if len(sys.argv) > 1:
+        readline.set_startup_hook(lambda: readline.insert_text(sys.argv[1]))
     manager = MissionManager()
     manager.interact()
 
