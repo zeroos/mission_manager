@@ -12,7 +12,7 @@ from rclpy.qos import QoSPresetProfiles
 
 from mission_manager_msgs.msg import MissionCommand
 
-MISSION_TOPIC_NAME = 'mission'
+MISSION_TOPIC_NAME = '/mission'
 
 MISSION_CMD_START = 'start'
 MISSION_CMD_END = 'end'
