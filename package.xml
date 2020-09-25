@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
   <name>mission_manager</name>
-  <version>0.0.0</version>
+  <version>0.0.1</version>
   <description>A python module that can be used to start, stop and change parameters of the mission.</description>
   <maintainer email="michal.barcis@aau.at">Michał Barciś</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
