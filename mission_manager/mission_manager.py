@@ -1,16 +1,18 @@
 import math
 from datetime import timedelta, datetime
 from dateutil.parser import parse as parse_timestamp
+import readline
 import sys
 import time
 
 from builtin_interfaces.msg import Time
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSPresetProfiles
 
 from mission_manager_msgs.msg import MissionCommand
 
-MISSION_TOPIC_NAME = 'mission'
+MISSION_TOPIC_NAME = '/mission'
 
 MISSION_CMD_START = 'start'
 MISSION_CMD_END = 'end'
@@ -67,12 +69,18 @@ class MissionManager(Node):
         super().__init__('mission_manager')
         self.publisher_ = self.create_publisher(
             MissionCommand,
-            MISSION_TOPIC_NAME
+            MISSION_TOPIC_NAME,
+            qos_profile=QoSPresetProfiles.get_from_short_key(
+                'PARAMETER_EVENTS'
+            )
         )
         self.subscription = self.create_subscription(
             MissionCommand,
             MISSION_TOPIC_NAME,
-            self.listener_callback
+            self.listener_callback,
+            qos_profile=QoSPresetProfiles.get_from_short_key(
+                'PARAMETER_EVENTS'
+            )
         )
         self.subscription  # prevent unused variable warning
         self.reset_reports()
@@ -170,8 +178,13 @@ class MissionManager(Node):
 
         return timestamp
 
-    def interpret_command(self, user_input):
-        cmd_all = user_input.strip().split()
+    def interpret_commands(self, user_input):
+        cmds = user_input.split(';')
+        for cmd in cmds:
+            self.interpret_command(cmd)
+
+    def interpret_command(self, command):
+        cmd_all = command.strip().split()
         if len(cmd_all) == 0:
             return
         cmd = cmd_all[0]
@@ -243,8 +256,12 @@ class MissionManager(Node):
         self.display_help()
         cmd = ''
         while cmd != USER_CMD_CLOSE:
-            cmd = input('CMD >> ')
-            self.interpret_command(cmd)
+            try:
+                cmd = input('CMD >> ')
+                self.interpret_commands(cmd)
+            except Exception as e:
+                print("ERROR", e)
+
         print('Bye!')
 
     def count_managed_nodes(self):
@@ -255,10 +272,9 @@ def cmd(args=None):
     rclpy.init(args=args)
     manager = MissionManager()
 
-    cmds = sys.argv[-1].split(';')
-    print("Executing commands '{}'".format(cmds))
-    for cmd in cmds:
-        manager.interpret_command(cmd)
+    cmd_str = sys.argv[-1]
+    print("Executing commands '{}'".format(cmd_str))
+    manager.interpret_commands(cmd_str)
 
     print('Spinning')
     rclpy.spin(manager)
@@ -266,6 +282,8 @@ def cmd(args=None):
 
 def cli(args=None):
     rclpy.init(args=args)
+    if len(sys.argv) > 1:
+        readline.set_startup_hook(lambda: readline.insert_text(sys.argv[1]))
     manager = MissionManager()
     manager.interact()
 
