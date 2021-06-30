@@ -57,6 +57,9 @@ class MissionExecutor:
     def change_params(self, params, timestamp):
         raise NotImplementedError()
 
+    def progress_reported(self, progress):
+        pass
+
     def add_progress_callback(self, progress_callback):
         self.report_progress = progress_callback
 
@@ -121,7 +124,7 @@ class MissionClientMixin(object):
                 )
         elif msg.command == MissionCommand.REPORT_PROGRESS:
             def op(exe):
-                pass
+                exe.progress_reported(msg.args)
         else:
             def op(exe):
                 pass
