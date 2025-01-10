@@ -1,7 +1,5 @@
 from datetime import datetime
 
-import rclpy
-from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
 
@@ -17,6 +15,15 @@ def _datetime_from_time_msg(time):
 
 
 class MissionExecutor:
+    def __init__(self, custom_command_helper=None):
+        self.custom_cmd_dict = {}
+        if custom_command_helper:
+            for func_name in dir(custom_command_helper):
+                if not func_name.startswith("__"):
+                    func = getattr(custom_command_helper, func_name)
+                    if callable(func):
+                        self.custom_cmd_dict[func_name.upper()] = func
+
     def _delay_execution(self, func, timestamp):
         timer = None
 
@@ -29,6 +36,15 @@ class MissionExecutor:
             max(wait_time.total_seconds(), 0),
             _timer_callback
         )
+
+    def custom_cmd_at_timestamp(self, custom_command, args, timestamp):
+        if custom_command not in self.custom_cmd_dict:
+            print(f"Unknown custom command: {custom_command}")
+            return
+        def _custom_cmd_callback():
+            self.custom_cmd_dict[custom_command](*args)
+
+        self._delay_execution(_custom_cmd_callback, timestamp)
 
     def start_mission_at_timestamp(self, timestamp):
         def _start_mission_callback():
@@ -125,6 +141,27 @@ class MissionClientMixin(object):
         elif msg.command == MissionCommand.REPORT_PROGRESS:
             def op(exe):
                 exe.progress_reported(msg.args)
+
+        elif msg.command == MissionCommand.CUSTOM_COMMAND:
+            self.get_logger().info(f'Received custom command: {msg.custom_command_func}')
+
+            if msg.custom_command_func:
+                custom_command_func = msg.custom_command_func.upper()
+                additional_args = msg.args
+                timestamp = _datetime_from_time_msg(msg.stamp)
+
+                def op(exe):
+                    if hasattr(exe, "custom_cmd_at_timestamp"):
+                        exe.custom_cmd_at_timestamp(custom_command_func, additional_args, timestamp)
+                    else:
+                        self.get_logger().warn(f'MissionExecutor does not support custom commands.')
+
+            else:
+                self.get_logger().warn('No custom command provided.')
+
+                def op(exe):
+                    pass
+
         else:
             def op(exe):
                 pass
@@ -149,44 +186,3 @@ class MissionClientMixin(object):
 
 class MissionClient(MissionClientMixin, Node):
     pass
-
-
-class MockMissionExecutor(Node, MissionExecutor):
-    def start_mission(self, timestamp):
-        self.get_logger().info(
-            'Starting mission'
-        )
-
-    def end_mission(self, timestamp):
-        self.get_logger().info(
-            'Ending mission'
-        )
-
-    def change_params(self, params, timestamp):
-        self.get_logger().info(
-            'Changing parameters to {}'.format(params)
-        )
-        self.report_progress(params.get('p', 'unknown'))
-
-
-def start_mock_client(args=None):
-    rclpy.init(args=args)
-
-    mock_executor = MockMissionExecutor('mock_mission_client')
-    mission_client = MissionClient()
-    mission_client.add_mission_executor(mock_executor)
-
-    executor = SingleThreadedExecutor()
-    executor.add_node(mock_executor)
-    executor.add_node(mission_client)
-
-    mission_client.get_logger().info(
-        'Node initialized, waiting for events.'
-    )
-    executor.spin()
-
-    rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    start_mock_client()

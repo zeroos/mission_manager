@@ -3,9 +3,9 @@ from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
 
 from mission_manager_msgs.msg import MissionCommand
-from ..mission_manager import MISSION_TOPIC_NAME, get_time_msg
+from ...mission_manager import MISSION_TOPIC_NAME, get_time_msg
 
-class AutoMissionManager(Node):
+class AutoMissionManager_custom_cmd(Node):
     def __init__(self, node_name='Automatic_mission_manager'):
         super().__init__(node_name)
 
@@ -16,12 +16,11 @@ class AutoMissionManager(Node):
         )
 
         self.timer_counter = 0
-        self.timer_period = 5.0
+        self.timer_period = 3.0
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         self.get_logger().info("Automatic_mission_manager started.")
 
     def timer_callback(self):
-        
         if self.timer_counter % 3 == 0:
             msg = MissionCommand()
             msg.command = MissionCommand.MISSION_START
@@ -31,11 +30,12 @@ class AutoMissionManager(Node):
 
         elif self.timer_counter % 3 == 1:
             msg = MissionCommand()
-            msg.command = MissionCommand.CHANGE_PARAMS
+            msg.command = MissionCommand.CUSTOM_COMMAND
             msg.stamp = get_time_msg()
-            msg.args = ["p=42"]
+            msg.custom_command_func = "PAUSE_MISSION"
+            msg.args = ["duration=10s", "reason=safety_check"]
             self.publisher.publish(msg)
-            self.get_logger().info("Automatic_mission_manager Timer: Publishing CHANGE_PARAMS command with p=42.")
+            self.get_logger().info("Automatic_mission_manager Timer: Publishing CUSTOM_COMMAND (PAUSE_MISSION).")
         
         elif self.timer_counter % 3 == 2:
             msg = MissionCommand()
@@ -43,18 +43,20 @@ class AutoMissionManager(Node):
             msg.stamp = get_time_msg()
             self.publisher.publish(msg)
             self.get_logger().info("Automatic_mission_manager Timer: Publishing MISSION_END command.")
-        self.timer_counter += 1
 
+
+        self.timer_counter += 1
 
 
 def start_auto_mission_manager(args=None):
     try:
         rclpy.init(args=args)
-        fsm = AutoMissionManager()
+        fsm = AutoMissionManager_custom_cmd()
         rclpy.spin(fsm)
     finally:
         fsm.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     start_auto_mission_manager()
