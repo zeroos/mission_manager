@@ -33,8 +33,8 @@ setup(
             'cli = mission_manager.mission_manager:cli',
             'cmd = mission_manager.mission_manager:cmd',
             'example_client = mission_manager.client:start_mock_client',
-            'example_fsm_manager = mission_manager.examples.fsm_manager:start_fsm_manager',
-            'example_fsm_client = mission_manager.examples.fsm_client:start_fsm_client',
+            'example_fsm_manager = mission_manager.examples.auto_mission_manager:start_fsm_manager',
+            'example_fsm_client = mission_manager.examples.fsm_client:start_auto_mission_manager',
         ],
     },
 )
