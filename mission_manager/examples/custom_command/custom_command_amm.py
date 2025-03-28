@@ -6,6 +6,21 @@ from mission_manager_msgs.msg import MissionCommand
 from ...mission_manager import MISSION_TOPIC_NAME, get_time_msg
 
 class AutoMissionManager_custom_cmd(Node):
+    """
+    A ROS2 node that manages mission commands with support for custom command execution.
+
+    This node periodically publishes mission commands by cycling through a sequence of actions:
+      - MISSION_START: Initiates the mission.
+      - CUSTOM_COMMAND: Executes a custom command (e.g., PAUSE_MISSION) with associated parameters.
+      - MISSION_END: Concludes the mission.
+      
+    By integrating custom command functionality, this implementation extends the basic AutoMissionManager concept,
+    allowing for additional, client-defined behaviors during mission execution. The commands are dispatched using a timer,
+    ensuring regular and predictable communication with mission components.
+
+    The relevant custom commands are implemented in:
+         mission_manager/examples/custom_command/custom_command.py 
+    """
     def __init__(self, node_name='Automatic_mission_manager'):
         super().__init__(node_name)
 

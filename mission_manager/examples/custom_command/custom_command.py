@@ -5,6 +5,16 @@ from rclpy.node import Node
 from ...client import MissionExecutor, MissionClient
 
 class CustomCmdHelper:
+    """
+    A helper class that defines custom command functions for mission operations.
+
+    The custom commands are implemented as methods in this class. Each method's name 
+        serves as the command identifier.
+
+    Only methods intended to be used as custom commands should be included, as all 
+        callable methods (except those with names containing double underscores)
+        may be invoked as custom commands.
+    """
     def pause_mission(self, *args):
         print(f"Pausing mission with args: {args}")
 

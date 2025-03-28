@@ -6,6 +6,21 @@ from mission_manager_msgs.msg import MissionCommand
 from ...mission_manager import MISSION_TOPIC_NAME, get_time_msg
 
 class AutoMissionManager(Node):
+    """
+    A ROS2 node that demonstrates mission management without a CLI interface.
+
+    This node simulates a mission by publishing a sequence of mission commands at regular 
+        intervals using a timer.
+    It cycles through the following commands:
+      - MISSION_START: To initiate the mission.
+      - CHANGE_PARAMS: To adjust mission parameters (e.g., setting "p=42").
+      - MISSION_END: To conclude the mission.
+
+    The node is designed to be onboard a drone or similar system, reacting to events or 
+        external sensor inputs in a real-world application. In this example, the timer 
+        mimics mission execution by triggering the command sequence based on the
+        current timestamp.
+    """
     def __init__(self, node_name='Automatic_mission_manager'):
         super().__init__(node_name)
 

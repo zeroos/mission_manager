@@ -16,6 +16,12 @@ class FSMStates:
 
 
 class FSMMissionExecutor(Node, MissionExecutor):
+    """
+    A ROS2 node that executes mission commands using a finite state machine (FSM).
+
+    This class demonstrates how to manage a mission lifecycle by transitioning through defined states.
+    Made to showcase the use of AutoMissionManager example. 
+    """
     def __init__(self, node_name='fsm_mission_executor'):
         super().__init__(node_name)
         self.state = FSMStates.IDLE
