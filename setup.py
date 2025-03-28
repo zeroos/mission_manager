@@ -32,7 +32,11 @@ setup(
         'console_scripts': [
             'cli = mission_manager.mission_manager:cli',
             'cmd = mission_manager.mission_manager:cmd',
-            'example_client = mission_manager.client:start_mock_client',
+            'example_client = mission_manager.examples.mock_mission_client.mock_mission_client:start_mock_client',
+            'example_auto_mission_manager = mission_manager.examples.auto_mission_manager.auto_mission_manager:start_auto_mission_manager',
+            'example_fsm_client = mission_manager.examples.auto_mission_manager.fsm_client:start_fsm_client',
+            'example_custom_cmd_client = mission_manager.examples.custom_command.custom_command:start_custom_cmd_client',
+            'example_custom_cmd_manager = mission_manager.examples.custom_command.custom_command_amm:start_auto_mission_manager',
         ],
     },
 )
